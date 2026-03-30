@@ -1,0 +1,94 @@
+package com.kilocode.android.data.api
+
+import com.kilocode.android.data.model.*
+import retrofit2.Response
+import retrofit2.http.*
+
+interface KiloCodeApi {
+
+    // Session endpoints
+    @GET("session")
+    suspend fun listSessions(
+        @Query("directory") directory: String? = null,
+        @Query("roots") roots: Boolean? = null,
+        @Query("limit") limit: Int? = null,
+        @Query("search") search: String? = null,
+    ): Response<List<Session>>
+
+    @GET("session/{sessionID}")
+    suspend fun getSession(
+        @Path("sessionID") sessionID: String,
+    ): Response<Session>
+
+    @POST("session")
+    suspend fun createSession(
+        @Body request: Map<String, String>,
+    ): Response<Session>
+
+    @DELETE("session/{sessionID}")
+    suspend fun deleteSession(
+        @Path("sessionID") sessionID: String,
+    ): Response<Unit>
+
+    @GET("session/{sessionID}/message")
+    suspend fun listMessages(
+        @Path("sessionID") sessionID: String,
+    ): Response<List<Message>>
+
+    @GET("session/{sessionID}/message/{messageID}/part")
+    suspend fun listParts(
+        @Path("sessionID") sessionID: String,
+        @Path("messageID") messageID: String,
+    ): Response<List<Part>>
+
+    @POST("session/{sessionID}/prompt")
+    suspend fun sendPrompt(
+        @Path("sessionID") sessionID: String,
+        @Body request: Map<String, Any>,
+    ): Response<Message>
+
+    @POST("session/{sessionID}/abort")
+    suspend fun abortSession(
+        @Path("sessionID") sessionID: String,
+    ): Response<Unit>
+
+    @GET("session/status")
+    suspend fun getSessionStatus(): Response<Map<String, SessionStatus>>
+
+    // File endpoints
+    @GET("file")
+    suspend fun listFiles(
+        @Query("directory") directory: String? = null,
+    ): Response<List<FileNode>>
+
+    @GET("file/read")
+    suspend fun readFile(
+        @Query("path") path: String,
+    ): Response<Map<String, String>>
+
+    // Provider endpoints
+    @GET("provider")
+    suspend fun listProviders(): Response<List<Provider>>
+
+    // Config endpoints
+    @GET("config")
+    suspend fun getConfig(): Response<Config>
+
+    // Project endpoints
+    @GET("project")
+    suspend fun getProject(): Response<Project>
+
+    // MCP endpoints
+    @GET("mcp")
+    suspend fun listMcpServers(): Response<List<McpServer>>
+
+    @POST("mcp")
+    suspend fun addMcpServer(
+        @Body server: McpServer,
+    ): Response<McpServer>
+
+    @DELETE("mcp/{name}")
+    suspend fun removeMcpServer(
+        @Path("name") name: String,
+    ): Response<Unit>
+}
