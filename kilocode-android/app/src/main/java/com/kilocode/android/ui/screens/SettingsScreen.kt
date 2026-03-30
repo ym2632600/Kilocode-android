@@ -1,5 +1,7 @@
 package com.kilocode.android.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kilocode.android.BuildConfig
 
@@ -21,6 +24,7 @@ fun SettingsScreen(
 ) {
     var serverUrlText by remember { mutableStateOf(serverUrl) }
     var showSaveConfirmation by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -110,7 +114,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Server URL saved. Restart the app to apply changes.",
+                            text = "Server URL saved and applied successfully.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -191,7 +195,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = { },
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://kilo.ai/docs"))
+                    context.startActivity(intent)
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
@@ -205,7 +212,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = { },
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Kilo-Org/kilocode/issues"))
+                    context.startActivity(intent)
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(

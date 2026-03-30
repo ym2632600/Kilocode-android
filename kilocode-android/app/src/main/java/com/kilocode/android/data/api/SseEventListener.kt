@@ -15,6 +15,7 @@ class SseEventListener(
 
     companion object {
         private const val TAG = "SSE"
+        private val gson = Gson()
     }
 
     override fun onOpen(eventSource: EventSource, response: Response) {
@@ -27,9 +28,8 @@ class SseEventListener(
         type: String?,
         data: String,
     ) {
-        Log.d(TAG, "SSE event: type=$type, data=${data.take(100)}")
+        Log.d(TAG, "SSE event: type=$type")
         try {
-            val gson = Gson()
             val mapType = object : TypeToken<Map<String, Any>>() {}.type
             val eventData: Map<String, Any> = gson.fromJson(data, mapType)
             onEvent(type ?: "unknown", eventData)

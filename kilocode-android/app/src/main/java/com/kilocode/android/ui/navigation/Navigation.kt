@@ -1,7 +1,6 @@
 package com.kilocode.android.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -23,6 +22,7 @@ sealed class Screen(val route: String) {
 fun KiloCodeNavHost(
     navController: NavHostController,
     serverUrl: String,
+    onServerUrlChanged: (String) -> Unit,
 ) {
     NavHost(
         navController = navController,
@@ -58,7 +58,7 @@ fun KiloCodeNavHost(
             SettingsScreen(
                 serverUrl = serverUrl,
                 onBack = { navController.popBackStack() },
-                onServerUrlChanged = { },
+                onServerUrlChanged = onServerUrlChanged,
             )
         }
     }

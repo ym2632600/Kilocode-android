@@ -28,8 +28,20 @@ fun HomeScreen(
     val isLoading by repository.isLoading.collectAsState()
     val error by repository.error.collectAsState()
 
+    var showNewSessionDialog by remember { mutableStateOf(false) }
+    var directoryPath by remember { mutableStateOf("/") }
+
     LaunchedEffect(Unit) {
         repository.loadSessions()
+    }
+
+    fun createSession() {
+        scope.launch {
+            val session = repository.createSession(directoryPath.ifBlank { "/" })
+            if (session != null) {
+                onSessionClick(session.id)
+            }
+        }
     }
 
     Scaffold(
@@ -59,14 +71,7 @@ fun HomeScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    scope.launch {
-                        val session = repository.createSession("/")
-                        if (session != null) {
-                            onSessionClick(session.id)
-                        }
-                    }
-                },
+                onClick = { showNewSessionDialog = true },
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -99,14 +104,7 @@ fun HomeScreen(
                     SessionList(
                         sessions = sessions,
                         onSessionClick = onSessionClick,
-                        onNewSession = {
-                            scope.launch {
-                                val session = repository.createSession("/")
-                                if (session != null) {
-                                    onSessionClick(session.id)
-                                }
-                            }
-                        },
+                        onNewSession = { showNewSessionDialog = true },
                         onDeleteSession = { sessionId ->
                             scope.launch {
                                 repository.deleteSession(sessionId)
@@ -116,5 +114,44 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    if (showNewSessionDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewSessionDialog = false },
+            title = { Text("New Session") },
+            text = {
+                Column {
+                    Text(
+                        text = "Enter the working directory for this session:",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = directoryPath,
+                        onValueChange = { directoryPath = it },
+                        label = { Text("Directory Path") },
+                        placeholder = { Text("/") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showNewSessionDialog = false
+                        createSession()
+                    },
+                ) {
+                    Text("Create")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewSessionDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }

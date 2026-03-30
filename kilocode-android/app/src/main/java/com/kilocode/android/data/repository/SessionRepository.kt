@@ -5,10 +5,15 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.kilocode.android.data.api.ApiClient
 import com.kilocode.android.data.model.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import okhttp3.sse.EventSource
+import java.util.UUID
 
 class SessionRepository(private val apiClient: ApiClient) {
 
@@ -96,9 +101,12 @@ class SessionRepository(private val apiClient: ApiClient) {
         try {
             val response = apiClient.api.listMessages(sessionId)
             if (response.isSuccessful) {
-                _messages.value = response.body() ?: emptyList()
-                for (message in _messages.value) {
-                    loadParts(sessionId, message.id)
+                val msgs = response.body() ?: emptyList()
+                _messages.value = msgs
+                withContext(Dispatchers.IO) {
+                    msgs.map { message ->
+                        async { loadParts(sessionId, message.id) }
+                    }.awaitAll()
                 }
             }
         } catch (e: Exception) {
@@ -168,8 +176,9 @@ class SessionRepository(private val apiClient: ApiClient) {
 
     fun connectSse(sessionId: String) {
         disconnectSse()
+        val baseUrl = apiClient.baseUrl.removeSuffix("/")
         eventSource = apiClient.createEventSource(
-            "session/$sessionId/events",
+            "$baseUrl/session/$sessionId/events",
             object : okhttp3.sse.EventSourceListener() {
                 override fun onEvent(
                     eventSource: EventSource,
@@ -249,7 +258,7 @@ class SessionRepository(private val apiClient: ApiClient) {
     }
 
     private fun generateMessageId(): String {
-        return "msg_${System.currentTimeMillis()}_${(Math.random() * 10000).toInt()}"
+        return "msg_${UUID.randomUUID()}"
     }
 
     fun clearError() {

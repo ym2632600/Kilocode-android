@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.navigation.compose.rememberNavController
+import com.kilocode.android.data.api.ApiClient
 import com.kilocode.android.ui.navigation.KiloCodeNavHost
 import com.kilocode.android.ui.theme.KiloCodeTheme
 
@@ -23,11 +24,15 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val navController = rememberNavController()
-                    val serverUrl = BuildConfig.DEFAULT_SERVER_URL
+                    var serverUrl by remember { mutableStateOf(BuildConfig.DEFAULT_SERVER_URL) }
 
                     KiloCodeNavHost(
                         navController = navController,
                         serverUrl = serverUrl,
+                        onServerUrlChanged = { newUrl ->
+                            serverUrl = newUrl
+                            ApiClient.updateBaseUrl(newUrl)
+                        },
                     )
                 }
             }

@@ -10,7 +10,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-class ApiClient(private val baseUrl: String) {
+class ApiClient(val baseUrl: String) {
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -48,7 +48,9 @@ class ApiClient(private val baseUrl: String) {
         }
 
         fun updateBaseUrl(baseUrl: String) {
-            INSTANCE = ApiClient(baseUrl)
+            synchronized(this) {
+                INSTANCE = ApiClient(baseUrl)
+            }
         }
     }
 }
