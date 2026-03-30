@@ -2,7 +2,6 @@ package com.kilocode.android.data.api
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
@@ -10,7 +9,9 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-class ApiClient(val baseUrl: String) {
+class ApiClient(baseUrl: String) {
+
+    val baseUrl: String = baseUrl.removeSuffix("/") + "/"
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -19,7 +20,7 @@ class ApiClient(val baseUrl: String) {
         .build()
 
     private val retrofit = Retrofit.Builder()
-        .baseUrl(baseUrl)
+        .baseUrl(this.baseUrl)
         .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
@@ -31,7 +32,7 @@ class ApiClient(val baseUrl: String) {
         listener: EventSourceListener,
     ): EventSource {
         val request = Request.Builder()
-            .url("$baseUrl$path")
+            .url("${baseUrl}${path}")
             .build()
         val factory = EventSources.createFactory(okHttpClient)
         return factory.newEventSource(request, listener)

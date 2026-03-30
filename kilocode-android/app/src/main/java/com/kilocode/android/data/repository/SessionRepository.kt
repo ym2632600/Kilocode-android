@@ -11,14 +11,16 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.sse.EventSource
 import java.util.UUID
 
 class SessionRepository(private val apiClient: ApiClient) {
 
-    private val gson = Gson()
     private var eventSource: EventSource? = null
+    private val sseMutex = Mutex()
 
     private val _sessions = MutableStateFlow<List<Session>>(emptyList())
     val sessions: StateFlow<List<Session>> = _sessions.asStateFlow()
@@ -90,6 +92,8 @@ class SessionRepository(private val apiClient: ApiClient) {
             if (response.isSuccessful) {
                 _currentSession.value = response.body()
                 loadMessages(sessionId)
+            } else {
+                _error.value = "Failed to load session: ${response.code()}"
             }
         } catch (e: Exception) {
             Log.e("SessionRepo", "Error selecting session", e)
@@ -108,9 +112,12 @@ class SessionRepository(private val apiClient: ApiClient) {
                         async { loadParts(sessionId, message.id) }
                     }.awaitAll()
                 }
+            } else {
+                _error.value = "Failed to load messages: ${response.code()}"
             }
         } catch (e: Exception) {
             Log.e("SessionRepo", "Error loading messages", e)
+            _error.value = "Connection error: ${e.message}"
         }
     }
 
@@ -118,7 +125,7 @@ class SessionRepository(private val apiClient: ApiClient) {
         try {
             val response = apiClient.api.listParts(sessionId, messageId)
             if (response.isSuccessful) {
-                val messageParts = response.body() ?: emptyList()
+                val messageParts: List<Part> = response.body() ?: emptyList()
                 _parts.value = _parts.value + (messageId to messageParts)
             }
         } catch (e: Exception) {
@@ -152,7 +159,10 @@ class SessionRepository(private val apiClient: ApiClient) {
 
     suspend fun abortSession(sessionId: String) {
         try {
-            apiClient.api.abortSession(sessionId)
+            val response = apiClient.api.abortSession(sessionId)
+            if (!response.isSuccessful) {
+                Log.e("SessionRepo", "Failed to abort session: ${response.code()}")
+            }
         } catch (e: Exception) {
             Log.e("SessionRepo", "Error aborting session", e)
         }
@@ -168,9 +178,12 @@ class SessionRepository(private val apiClient: ApiClient) {
                     _messages.value = emptyList()
                     _parts.value = emptyMap()
                 }
+            } else {
+                _error.value = "Failed to delete session: ${response.code()}"
             }
         } catch (e: Exception) {
             Log.e("SessionRepo", "Error deleting session", e)
+            _error.value = "Connection error: ${e.message}"
         }
     }
 
@@ -180,6 +193,10 @@ class SessionRepository(private val apiClient: ApiClient) {
         eventSource = apiClient.createEventSource(
             "$baseUrl/session/$sessionId/events",
             object : okhttp3.sse.EventSourceListener() {
+                override fun onOpen(eventSource: EventSource, response: okhttp3.Response) {
+                    _isConnected.value = true
+                }
+
                 override fun onEvent(
                     eventSource: EventSource,
                     id: String?,
@@ -203,20 +220,17 @@ class SessionRepository(private val apiClient: ApiClient) {
                 }
             }
         )
-        _isConnected.value = true
     }
 
     private fun handleSseEvent(type: String?, data: String) {
         try {
-            val mapType = object : TypeToken<Map<String, Any>>() {}.type
-            val event: Map<String, Any> = gson.fromJson(data, mapType)
+            val event: Map<String, Any> = GSON.fromJson(data, MAP_TYPE)
             val properties = event["properties"] as? Map<String, Any> ?: return
 
             when (type) {
                 "message.updated" -> {
                     val info = properties["info"] as? Map<String, Any> ?: return
-                    val messageJson = gson.toJson(info)
-                    val message = gson.fromJson(messageJson, Message::class.java)
+                    val message = GSON.fromJson(GSON.toJsonTree(info), Message::class.java)
                     val current = _messages.value.toMutableList()
                     val index = current.indexOfFirst { it.id == message.id }
                     if (index >= 0) {
@@ -232,8 +246,7 @@ class SessionRepository(private val apiClient: ApiClient) {
                 }
                 "part.updated" -> {
                     val partData = properties["part"] as? Map<String, Any> ?: return
-                    val partJson = gson.toJson(partData)
-                    val part = gson.fromJson(partJson, Part::class.java)
+                    val part = GSON.fromJson(GSON.toJsonTree(partData), Part::class.java)
                     val currentParts = _parts.value.toMutableMap()
                     val messageParts = currentParts[part.messageID]?.toMutableList() ?: mutableListOf()
                     val index = messageParts.indexOfFirst { it.id == part.id }
@@ -263,5 +276,10 @@ class SessionRepository(private val apiClient: ApiClient) {
 
     fun clearError() {
         _error.value = null
+    }
+
+    companion object {
+        private val GSON = Gson()
+        private val MAP_TYPE = object : TypeToken<Map<String, Any>>() {}.type
     }
 }

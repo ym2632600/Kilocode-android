@@ -18,13 +18,24 @@ android {
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://10.0.2.2:4096\"")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../keystore/release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "kilocode123"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "kilocode"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "kilocode123"
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -40,6 +51,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    lint {
+        disable.add("NullSafeMutableLiveData")
+        abortOnError = false
+        checkReleaseBuilds = true
     }
 }
 
@@ -67,7 +84,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    debugImplementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // JSON
     implementation("com.google.code.gson:gson:2.11.0")

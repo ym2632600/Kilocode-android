@@ -1,7 +1,5 @@
 package com.kilocode.android.data.model
 
-import com.google.gson.annotations.SerializedName
-
 data class Session(
     val id: String,
     val directory: String,
@@ -145,21 +143,6 @@ data class ConfigProvider(
 data class SessionStatus(
     val sessionID: String,
     val status: String,
-)
-
-data class PromptRequest(
-    val messageID: String,
-    val parts: List<PromptPart>,
-)
-
-data class PromptPart(
-    val type: String,
-    val text: String? = null,
-)
-
-data class ServerEvent(
-    val type: String,
-    val properties: Map<String, Any>? = null,
 )
 
 data class McpServer(

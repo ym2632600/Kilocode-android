@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Android
+*.keystore
+*.jks
+*.apk
+*.aab
+kilocode-android/.gradle/
+kilocode-android/build/
+kilocode-android/app/build/
+kilocode-android/local.properties
+kilocode-android/.idea/

@@ -32,10 +32,14 @@ fun KiloCodeNavHost(
             HomeScreen(
                 serverUrl = serverUrl,
                 onSessionClick = { sessionId ->
-                    navController.navigate(Screen.Session.createRoute(sessionId))
+                    navController.navigate(Screen.Session.createRoute(sessionId)) {
+                        launchSingleTop = true
+                    }
                 },
                 onSettingsClick = {
-                    navController.navigate(Screen.Settings.route)
+                    navController.navigate(Screen.Settings.route) {
+                        launchSingleTop = true
+                    }
                 },
             )
         }
@@ -46,12 +50,16 @@ fun KiloCodeNavHost(
                 navArgument("sessionId") { type = NavType.StringType }
             ),
         ) { backStackEntry ->
-            val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
-            SessionScreen(
-                serverUrl = serverUrl,
-                sessionId = sessionId,
-                onBack = { navController.popBackStack() },
-            )
+            val sessionId = backStackEntry.arguments?.getString("sessionId")
+            if (sessionId != null) {
+                SessionScreen(
+                    serverUrl = serverUrl,
+                    sessionId = sessionId,
+                    onBack = { navController.popBackStack() },
+                )
+            } else {
+                navController.popBackStack()
+            }
         }
 
         composable(Screen.Settings.route) {

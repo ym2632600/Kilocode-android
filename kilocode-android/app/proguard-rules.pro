@@ -2,10 +2,10 @@
 -keepattributes *Annotation*
 -keepattributes Signature
 -keepattributes Exceptions
+-keepattributes InnerClasses
+-keepattributes EnclosingMethod
 
 # Gson
--keepattributes Signature
--keepattributes *Annotation*
 -dontwarn sun.misc.**
 -keep class com.google.gson.** { *; }
 -keep class * implements com.google.gson.TypeAdapterFactory
@@ -15,8 +15,6 @@
 # Retrofit
 -dontwarn retrofit2.**
 -keep class retrofit2.** { *; }
--keepattributes Signature
--keepattributes Exceptions
 -keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
 }
@@ -25,6 +23,32 @@
 -dontwarn okhttp3.**
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
+-dontwarn okio.**
 
 # Data models
 -keep class com.kilocode.android.data.model.** { *; }
+
+# Kotlin
+-dontwarn kotlin.**
+-keep class kotlin.Metadata { *; }
+-keepclassmembers class **$WhenMappings {
+    <fields>;
+}
+
+# Coroutines
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+
+# Compose
+-dontwarn androidx.compose.**
+-keep class androidx.compose.** { *; }
+
+# Navigation
+-keep class androidx.navigation.** { *; }
+
+# AndroidX
+-keep class androidx.lifecycle.** { *; }
+-keep class androidx.activity.** { *; }

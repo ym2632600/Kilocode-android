@@ -55,7 +55,7 @@ fun SessionListItem(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+    val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
     val date = Date(session.time.updated)
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
