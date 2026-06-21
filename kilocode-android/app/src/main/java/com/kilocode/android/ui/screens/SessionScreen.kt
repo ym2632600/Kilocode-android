@@ -1,145 +1,321 @@
 package com.kilocode.android.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kilocode.android.data.api.ApiClient
+import com.kilocode.android.data.model.Agent
+import com.kilocode.android.data.model.ModelOption
+import com.kilocode.android.data.model.Part
 import com.kilocode.android.data.repository.SessionRepository
 import com.kilocode.android.ui.components.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionScreen(
-    serverUrl: String,
     sessionId: String,
+    serverUrl: String,
+    sharedSecret: String?,
     onBack: () -> Unit,
 ) {
-    val apiClient = remember { ApiClient.getInstance(serverUrl) }
-    val repository = remember { SessionRepository(apiClient) }
+    val apiClient = remember(serverUrl, sharedSecret) { ApiClient.getInstance(serverUrl, sharedSecret ?: "") }
+    val repository = remember(apiClient) { SessionRepository(apiClient) }
     val scope = rememberCoroutineScope()
 
     val currentSession by repository.currentSession.collectAsState()
     val messages by repository.messages.collectAsState()
     val parts by repository.parts.collectAsState()
+    val agents by repository.agents.collectAsState()
+    val models by repository.models.collectAsState()
     val isLoading by repository.isLoading.collectAsState()
     val isConnected by repository.isConnected.collectAsState()
     val error by repository.error.collectAsState()
 
     val listState = rememberLazyListState()
+    var selectedAgent by remember { mutableStateOf<Agent?>(null) }
+    var selectedModel by remember { mutableStateOf<ModelOption?>(null) }
+    var autonomousMode by remember { mutableStateOf(false) }
+    var continueGeneration by remember { mutableStateOf(0) }
 
-    LaunchedEffect(sessionId) {
-        repository.selectSession(sessionId)
-        repository.connectSse(sessionId)
-    }
-
-    DisposableEffect(sessionId) {
-        onDispose {
-            repository.disconnectSse()
+    val hasPendingWork by remember(parts) {
+        derivedStateOf {
+            parts.values.flatten().any { part ->
+                part.state?.status == "pending" || part.state?.status == "running"
+            }
         }
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    val isAtBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible >= (info.totalItemsCount - 1)
+        }
+    }
+
+    val topBarAlpha by animateFloatAsState(
+        targetValue = if (listState.firstVisibleItemIndex > 0) 0.92f else 1f,
+        animationSpec = tween(200),
+        label = "topBarAlpha",
+    )
+
+    LaunchedEffect(Unit) {
+        repository.listAgents()
+        repository.listModels()
+    }
+    LaunchedEffect(agents) {
+        selectedAgent = agents.firstOrNull { it.name == selectedAgent?.name }
+            ?: agents.firstOrNull { it.mode == "primary" || it.mode == "all" }
+            ?: agents.firstOrNull()
+    }
+    LaunchedEffect(models) {
+        if (selectedModel == null && models.isNotEmpty()) {
+            selectedModel = models.firstOrNull { it.modelID == "kilo/nex-agi/nex-n2-pro:free" } ?: models.first()
+        }
+    }
+    LaunchedEffect(sessionId) {
+        repository.selectSession(sessionId)
+        repository.connectSse(sessionId, repository.currentSession.value?.directory)
+    }
+    DisposableEffect(sessionId) { onDispose { repository.disconnectSse() } }
+
+    val messageCount = messages.size
+    LaunchedEffect(messageCount) {
+        if (messageCount > 0 && (isAtBottom || messageCount <= 2)) listState.animateScrollToItem(messageCount - 1)
+    }
+    val lastPartCount = messages.lastOrNull()?.id?.let { parts[it]?.size } ?: 0
+    LaunchedEffect(lastPartCount) {
+        if (isAtBottom && messageCount > 0) listState.animateScrollToItem(messageCount - 1)
+    }
+
+    LaunchedEffect(autonomousMode, continueGeneration, isLoading, hasPendingWork, messages.size) {
+        if (!autonomousMode || isLoading || hasPendingWork || messages.isEmpty()) return@LaunchedEffect
+        delay(900)
+        if (autonomousMode && !isLoading && !hasPendingWork && messages.isNotEmpty()) {
+            repository.sendPrompt(sessionId, "continue", selectedAgent?.name, selectedModel)
+            continueGeneration++
+        }
+    }
+
+    fun sendPrompt(text: String) {
+        scope.launch {
+            repository.sendPrompt(sessionId, text, selectedAgent?.name, selectedModel)
         }
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
+                modifier = Modifier.graphicsLayer { alpha = topBarAlpha },
                 title = {
-                    Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Text(
                             text = currentSession?.title ?: "Session",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
-                        StatusChip(
-                            text = if (isConnected) "Live" else "Offline",
-                            isOnline = isConnected,
-                        )
+                        StatusChip(text = if (isConnected) "Live" else "Offline", isOnline = isConnected)
+                        if (autonomousMode) {
+                            AssistChip(
+                                onClick = { autonomousMode = false },
+                                label = { Text("Auto", fontSize = 10.sp) },
+                                leadingIcon = { Icon(Icons.Rounded.AutoMode, null, Modifier.size(14.dp)) },
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                        )
+                        Icon(Icons.Rounded.ArrowBack, "Back", modifier = Modifier.size(22.dp))
                     }
                 },
                 actions = {
-                    if (isLoading) {
+                    AnimatedVisibility(
+                        visible = isLoading,
+                        enter = fadeIn(tween(150)),
+                        exit = fadeOut(tween(300)),
+                    ) {
                         CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .padding(end = 12.dp),
+                            modifier = Modifier.padding(end = 14.dp).size(16.dp),
                             strokeWidth = 2.dp,
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
         bottomBar = {
             PromptInput(
-                onSend = { text ->
-                    scope.launch {
-                        repository.sendPrompt(sessionId, text)
-                    }
-                },
+                onSend = { sendPrompt(it) },
+                onContinue = { autonomousMode = !autonomousMode },
                 isLoading = isLoading,
+                models = models,
+                selectedModel = selectedModel,
+                onModelSelected = { selectedModel = it },
+                agents = agents,
+                selectedAgent = selectedAgent,
+                onAgentSelected = { selectedAgent = it },
+                autonomousMode = autonomousMode,
+                onAutonomousModeChanged = { autonomousMode = it },
+                messages = messages,
             )
         },
-    ) { paddingValues ->
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(padding),
         ) {
-            error?.let { errorMsg ->
-                ErrorCard(
-                    message = errorMsg,
-                    onRetry = { repository.clearError() },
-                )
+            AnimatedVisibility(
+                visible = error != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                error?.let { msg ->
+                    ErrorCard(message = msg, onRetry = {
+                        scope.launch {
+                            repository.clearError()
+                            repository.selectSession(sessionId)
+                        }
+                    })
+                }
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = PaddingValues(vertical = 8.dp),
-            ) {
-                items(
-                    items = messages,
-                    key = { it.id },
-                ) { message ->
-                    val messageParts = parts[message.id] ?: emptyList()
-                    MessageBubble(
-                        isUser = message.role == "user",
-                        parts = messageParts,
-                    )
-                }
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(end = 5.dp),
+                    state = listState,
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
+                ) {
+                    if (messages.isEmpty()) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillParentMaxHeight()
+                                    .padding(horizontal = 40.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                val float = rememberInfiniteTransition(label = "float")
+                                val floatY by float.animateFloat(
+                                    initialValue = 0f,
+                                    targetValue = -8f,
+                                    animationSpec = infiniteRepeatable(
+                                        tween(1800, easing = FastOutSlowInEasing),
+                                        RepeatMode.Reverse,
+                                    ),
+                                    label = "floatY",
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                                    modifier = Modifier.size(64.dp).graphicsLayer { translationY = floatY },
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(28.dp),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Ask anything",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Spacer(modifier = Modifier.height(5.dp))
+                                Text(
+                                    text = "Kilo will plan, write, and run code.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                )
+                            }
+                        }
+                    }
 
-                if (isLoading && messages.isNotEmpty()) {
-                    item {
+                    items(
+                        items = messages,
+                        key = { it.id ?: it.sessionID ?: messages.indexOf(it).toString() },
+                    ) { message ->
+                        val msgParts = message.id?.let { parts[it] } ?: emptyList()
+                        MessageBubble(
+                            isUser = message.role == "user",
+                            parts = msgParts,
+                            agent = message.agent,
+                        )
+                    }
+
+                    if (isLoading && messages.isNotEmpty()) {
+                        item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.CenterStart,
+                                .padding(start = 18.dp, top = 2.dp, bottom = 4.dp),
                         ) {
-                            TypingIndicator()
+                            Surface(
+                                shape = RoundedCornerShape(
+                                    topStart = 4.dp, topEnd = 16.dp,
+                                    bottomStart = 16.dp, bottomEnd = 16.dp,
+                                ),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            ) {
+                                TypingIndicator()
+                            }
                         }
+                        }
+                    }
+                }
+
+                AndroidScrollbar(
+                    listState = listState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .padding(vertical = 4.dp)
+                        .width(4.dp),
+                )
+
+                if (!isAtBottom && messages.isNotEmpty()) {
+                    SmallFloatingActionButton(
+                        onClick = { scope.launch { listState.animateScrollToItem(messages.size - 1) } },
+                        shape = RoundedCornerShape(12.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        elevation = FloatingActionButtonDefaults.elevation(2.dp, 2.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 14.dp, bottom = 12.dp),
+                    ) {
+                        Icon(Icons.Rounded.KeyboardArrowDown, "Scroll to latest", modifier = Modifier.size(18.dp))
                     }
                 }
             }
