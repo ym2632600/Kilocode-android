@@ -1,5 +1,6 @@
 package com.kilocode.android.data.api
 
+import com.google.gson.JsonObject
 import com.kilocode.android.data.model.*
 import retrofit2.Response
 import retrofit2.http.Body
@@ -23,6 +24,7 @@ interface KiloCodeApi {
     @GET("session/{sessionID}")
     suspend fun getSession(
         @Path("sessionID") sessionID: String,
+        @Query("directory") directory: String? = null,
     ): Response<Session>
 
     @POST("session")
@@ -38,22 +40,27 @@ interface KiloCodeApi {
     @GET("session/{sessionID}/message")
     suspend fun listMessages(
         @Path("sessionID") sessionID: String,
-    ): Response<List<Message>>
+    ): Response<List<MessageWithParts>>
 
-    @GET("session/{sessionID}/message/{messageID}/part")
-    suspend fun listParts(
+    @GET("session/{sessionID}/message/{messageID}")
+    suspend fun getMessage(
         @Path("sessionID") sessionID: String,
         @Path("messageID") messageID: String,
-    ): Response<List<Part>>
+    ): Response<MessageWithParts>
 
-    @POST("session/{sessionID}/prompt")
+    @POST("session/{sessionID}/message")
     suspend fun sendPrompt(
         @Path("sessionID") sessionID: String,
-        @Body request: Map<String, Any>,
-    ): Response<Message>
+        @Body request: PromptRequest,
+    ): Response<MessageWithParts>
 
     @POST("session/{sessionID}/abort")
     suspend fun abortSession(
+        @Path("sessionID") sessionID: String,
+    ): Response<Unit>
+
+    @POST("session/{sessionID}/compact")
+    suspend fun compactSession(
         @Path("sessionID") sessionID: String,
     ): Response<Unit>
 
@@ -73,7 +80,11 @@ interface KiloCodeApi {
 
     // Provider endpoints
     @GET("provider")
-    suspend fun listProviders(): Response<List<Provider>>
+    suspend fun listProviders(): Response<ProviderListResponse>
+
+    // Agent endpoints
+    @GET("agent")
+    suspend fun listAgents(): Response<List<Agent>>
 
     // Config endpoints
     @GET("config")
@@ -91,6 +102,9 @@ interface KiloCodeApi {
     suspend fun addMcpServer(
         @Body server: McpServer,
     ): Response<McpServer>
+
+    @POST("api/auth/github")
+    suspend fun authenticateGitHub(@Body body: Map<String, String>): Response<Unit>
 
     @DELETE("mcp/{name}")
     suspend fun removeMcpServer(

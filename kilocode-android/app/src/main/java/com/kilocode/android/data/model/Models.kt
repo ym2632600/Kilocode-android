@@ -1,25 +1,25 @@
 package com.kilocode.android.data.model
 
 data class Session(
-    val id: String,
-    val directory: String,
-    val title: String,
-    val time: SessionTime,
+    val id: String? = null,
+    val directory: String? = null,
+    val title: String? = null,
+    val time: SessionTime? = null,
     val parentID: String? = null,
     val version: String? = null,
     val pinned: Boolean = false,
 )
 
 data class SessionTime(
-    val created: Long,
-    val updated: Long,
+    val created: Long = 0,
+    val updated: Long = 0,
 )
 
 data class Message(
-    val id: String,
-    val sessionID: String,
-    val role: String,
-    val time: MessageTime,
+    val id: String? = null,
+    val sessionID: String? = null,
+    val role: String? = null,
+    val time: MessageTime? = null,
     val model: ModelInfo? = null,
     val agent: String? = null,
     val error: MessageError? = null,
@@ -31,15 +31,57 @@ data class Message(
     val tokens: TokenUsage? = null,
 )
 
+data class MessageWithParts(
+    val info: Message? = null,
+    val parts: List<Part> = emptyList(),
+)
+
 data class MessageTime(
     val created: Long,
     val completed: Long? = null,
+)
+
+data class ModelOption(
+    val providerID: String,
+    val modelID: String,
+    val displayName: String,
+    val category: String = "Models",
+) {
+    val key: String = "$providerID/$modelID"
+}
+
+data class ProviderListResponse(
+    val all: List<Provider> = emptyList(),
+    val connected: List<String> = emptyList(),
+    val default: Map<String, String> = emptyMap(),
 )
 
 data class ModelInfo(
     val providerID: String,
     val modelID: String,
 )
+
+data class ProviderModel(
+    val id: String,
+    val name: String,
+    val releaseDate: String? = null,
+    val attachment: Boolean = false,
+    val reasoning: Boolean = false,
+    val temperature: Boolean = true,
+    val toolCall: Boolean = true,
+    val cost: ModelCost? = null,
+    val limit: ModelLimit? = null,
+)
+
+data class SlashCommand(
+    val command: String,
+    val alias: String? = null,
+    val label: String,
+    val description: String,
+    val category: String,
+) {
+    val trigger: String = if (command.startsWith("/")) command else "/$command"
+}
 
 data class TokenUsage(
     val input: Long = 0,
@@ -59,10 +101,10 @@ data class MessageError(
 )
 
 data class Part(
-    val id: String,
-    val sessionID: String,
-    val messageID: String,
-    val type: String,
+    val id: String? = null,
+    val sessionID: String? = null,
+    val messageID: String? = null,
+    val type: String? = null,
     val text: String? = null,
     val tool: String? = null,
     val state: ToolState? = null,
@@ -151,4 +193,25 @@ data class McpServer(
     val args: List<String> = emptyList(),
     val env: Map<String, String> = emptyMap(),
     val enabled: Boolean = true,
+)
+
+data class Agent(
+    val id: String? = null,
+    val name: String,
+    val description: String? = null,
+    val mode: String? = null,
+    val builtIn: Boolean = false,
+    val color: String? = null,
+)
+
+data class PromptRequest(
+    val messageID: String? = null,
+    val parts: List<PartRequest>? = null,
+    val agent: String? = null,
+    val model: ModelInfo? = null,
+)
+
+data class PartRequest(
+    val type: String,
+    val text: String,
 )

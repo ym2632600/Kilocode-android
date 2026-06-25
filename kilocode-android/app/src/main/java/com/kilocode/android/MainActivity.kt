@@ -8,10 +8,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.rememberNavController
-import com.kilocode.android.data.api.ApiClient
+import com.kilocode.android.BuildConfig
 import com.kilocode.android.ui.navigation.KiloCodeNavHost
 import com.kilocode.android.ui.theme.KiloCodeTheme
+
+import androidx.compose.runtime.collectAsState
+import com.kilocode.android.data.repository.AuthPreferencesRepository
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,14 +31,55 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val navController = rememberNavController()
-                    var serverUrl by remember { mutableStateOf(BuildConfig.DEFAULT_SERVER_URL) }
+                    val context = LocalContext.current
+                    val authRepo = remember { AuthPreferencesRepository(context) }
+                    val sharedSecret by authRepo.sharedSecretFlow.collectAsState(initial = BuildConfig.KILO_SHARED_SECRET)
+                    val savedServerUrl by authRepo.serverUrlFlow.collectAsState(initial = null)
+                    val autonomousMode by authRepo.autonomousModeFlow.collectAsState(initial = false)
+                    var serverUrl by remember(savedServerUrl) { mutableStateOf(savedServerUrl ?: BuildConfig.DEFAULT_SERVER_URL) }
+
+                    LaunchedEffect(savedServerUrl) {
+                        savedServerUrl?.let {
+                            serverUrl = it
+                        }
+                    }
+
+                    LaunchedEffect(Unit) {
+                        com.kilocode.android.data.BinaryManager.startServer(context, serverUrl, autonomousMode)
+                    }
 
                     KiloCodeNavHost(
                         navController = navController,
                         serverUrl = serverUrl,
-                        onServerUrlChanged = { newUrl ->
-                            serverUrl = newUrl
-                            ApiClient.updateBaseUrl(newUrl)
+                        sharedSecret = sharedSecret,
+                        autonomousMode = autonomousMode,
+                        onServerUrlChanged = { newUrl, newSecret ->
+                            val normalizedUrl = newUrl.trim().ifBlank { BuildConfig.DEFAULT_SERVER_URL }
+                            serverUrl = normalizedUrl
+
+                            // Persist the new URL and shared secret together.
+                            kotlinx.coroutines.GlobalScope.launch {
+                                authRepo.saveServerUrl(normalizedUrl)
+                                authRepo.saveSharedSecret(newSecret)
+                            }
+
+                            // ApiClient update will be handled by the screens when they recompose due to serverUrl/sharedSecret change
+                            com.kilocode.android.data.BinaryManager.stopServer()
+                            com.kilocode.android.data.BinaryManager.startServer(context, normalizedUrl, autonomousMode)
+                        },
+                        onAutonomousModeChanged = { enabled ->
+                            kotlinx.coroutines.GlobalScope.launch {
+                                authRepo.saveAutonomousMode(enabled)
+                            }
+                            if (com.kilocode.android.data.BinaryManager.isServerRunning.value) {
+                                com.kilocode.android.data.BinaryManager.stopServer()
+                                com.kilocode.android.data.BinaryManager.startServer(context, serverUrl, enabled)
+                            }
+                        },
+                        onSharedSecretChanged = { newSecret ->
+                            kotlinx.coroutines.GlobalScope.launch {
+                                authRepo.saveSharedSecret(newSecret)
+                            }
                         },
                     )
                 }

@@ -6,50 +6,27 @@
 
 ## Recently Completed
 
-- [x] Cloned Kilo Code repository from GitHub (https://github.com/Kilo-Org/kilocode)
-- [x] Created Android project structure (`kilocode-android/`)
-- [x] Implemented data models matching Kilo Code server API
-- [x] Created Retrofit API client with SSE support
-- [x] Built SessionRepository for session management
-- [x] Created Jetpack Compose UI screens (Home, Session, Settings)
-- [x] Implemented Material 3 dark theme
-- [x] Added navigation between screens
-- [x] **Code Review Round 1**: Fixed 18 issues (security, thread safety, performance, UX)
-- [x] **Code Review Round 2**: Fixed 32 additional issues (race conditions, dead code, ProGuard)
-- [x] **Release Build**: Generated signed APK (8.0MB) with R8 minification
-- [x] **Network Security**: Added network security config for localhost HTTP
-- [x] **Launcher Icons**: Created adaptive icon resources
-- [x] **Gradle Wrapper**: Generated gradlew scripts and wrapper jar
-- [x] **Signing**: Configured release keystore and signing
-- [x] **ProGuard**: Comprehensive rules for Gson, Retrofit, OkHttp, Coroutines, Compose
-- [x] **Next.js**: All typecheck and lint checks pass
+- Fixed "typing twice" issue in `PromptInput.kt` by using `TextFieldValue` with `BasicTextField`.
+- Implemented scrolling to the bottom upon initial load of `SessionScreen.kt` using a `LaunchedEffect` and `isFirstLoad` flag.
+- [x] Fixed `Icons.Rounded.ArrowBack` deprecation in `SettingsScreen.kt` and `SessionScreen.kt` by using `Icons.AutoMirrored.Rounded.ArrowBack` and importing `androidx.compose.material.icons.automirrored.rounded.*`.
+- [x] Verified build success with `./gradlew assembleDebug`.
 
-## APK Output
+### Current State
 
-| Property | Value |
-|----------|-------|
-| File | `kilocode-android/app/build/outputs/apk/release/app-release.apk` |
-| Size | 8.0 MB |
-| Package | `com.kilocode.android` |
-| Version | 1.0.0 (versionCode 1) |
-| Min SDK | 26 (Android 8.0) |
-| Target SDK | 35 (Android 15) |
-| Signing | APK Signature Scheme v2 |
-| Minification | R8 enabled, resources shrunk |
+**Status**: Android client fully reviewed, fixed, and APK exported. Message rendering, animation, and lint deprecations resolved.
 
-## Project Structure
-
-| Directory | Purpose | Status |
-|-----------|---------|--------|
-| `kilocode-android/` | Native Android client app | Complete |
-| `kilocode-android/app/src/main/java/com/kilocode/android/` | Kotlin source code | Complete |
-| `kilocode-android/keystore/` | Release signing keystore | Complete |
-| `src/` | Next.js web template | Complete |
-
-## Session History
+### Session History
 
 | Date | Changes |
 |------|---------|
 | 2026-03-30 | Created Android client app |
 | 2026-03-30 | Code review round 1 - fixed 18 issues |
 | 2026-03-30 | Code review round 2 - fixed 32 issues, APK release build |
+| 2026-06-18 | Updated Android CI workflow and committed the workflow file; push is blocked by missing GitHub HTTPS credentials |
+| 2026-06-20 | Added `18.227.97.23` to Android network security cleartext domain allowlist and base cleartext config |
+| 2026-06-20 | Fixed Android session opening against current Kilo server message/event API and added server URL persistence |
+| 2026-06-20 | Added Android autonomous mode toggle persisted in Settings and passed to `kilo serve --auto` |
+| 2026-06-20 | Added remote Kilo agent listing, agent selection in chat, prompt sending fix, and polished chat UI |
+| 2026-06-24 | Created release 1.0.4 |
+| 2026-06-25 | Fixed `Icons.Rounded.ArrowBack` deprecation and verified build |
+

@@ -22,7 +22,11 @@ sealed class Screen(val route: String) {
 fun KiloCodeNavHost(
     navController: NavHostController,
     serverUrl: String,
-    onServerUrlChanged: (String) -> Unit,
+    sharedSecret: String?,
+    autonomousMode: Boolean,
+    onServerUrlChanged: (String, String) -> Unit,
+    onAutonomousModeChanged: (Boolean) -> Unit,
+    onSharedSecretChanged: (String) -> Unit,
 ) {
     NavHost(
         navController = navController,
@@ -31,12 +35,13 @@ fun KiloCodeNavHost(
         composable(Screen.Home.route) {
             HomeScreen(
                 serverUrl = serverUrl,
-                onSessionClick = { sessionId ->
+                sharedSecret = sharedSecret,
+                onNavigateToSession = { sessionId ->
                     navController.navigate(Screen.Session.createRoute(sessionId)) {
                         launchSingleTop = true
                     }
                 },
-                onSettingsClick = {
+                onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route) {
                         launchSingleTop = true
                     }
@@ -54,6 +59,7 @@ fun KiloCodeNavHost(
             if (sessionId != null) {
                 SessionScreen(
                     serverUrl = serverUrl,
+                    sharedSecret = sharedSecret,
                     sessionId = sessionId,
                     onBack = { navController.popBackStack() },
                 )
@@ -64,9 +70,17 @@ fun KiloCodeNavHost(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
-                serverUrl = serverUrl,
+                defaultServerUrl = serverUrl,
+                sharedSecret = sharedSecret ?: "",
+                autonomousMode = autonomousMode,
                 onBack = { navController.popBackStack() },
                 onServerUrlChanged = onServerUrlChanged,
+                onAutonomousModeChanged = onAutonomousModeChanged,
+                onSharedSecretChanged = onSharedSecretChanged,
+                onSave = { url, secret ->
+                    onServerUrlChanged(url, secret)
+                    onSharedSecretChanged(secret)
+                }
             )
         }
     }

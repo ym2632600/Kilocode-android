@@ -1,5 +1,7 @@
 package com.kilocode.android.data.api
 
+import android.util.Log
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.sse.EventSource
@@ -9,14 +11,15 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-class ApiClient(baseUrl: String) {
+class ApiClient(baseUrl: String, sharedSecret: String) {
 
     val baseUrl: String = baseUrl.removeSuffix("/") + "/"
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .addInterceptor(AuthInterceptor(sharedSecret))
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
     private val retrofit = Retrofit.Builder()
@@ -26,6 +29,14 @@ class ApiClient(baseUrl: String) {
         .build()
 
     val api: KiloCodeApi = retrofit.create(KiloCodeApi::class.java)
+
+    fun createStreamCall(path: String): okhttp3.Call {
+        val request = Request.Builder()
+            .url("${baseUrl}${path}")
+            .header("Accept", "text/event-stream")
+            .build()
+        return okHttpClient.newCall(request)
+    }
 
     fun createEventSource(
         path: String,
@@ -41,16 +52,45 @@ class ApiClient(baseUrl: String) {
     companion object {
         @Volatile
         private var INSTANCE: ApiClient? = null
+        private var instanceBaseUrl: String? = null
+        private var instanceSharedSecret: String? = null
 
-        fun getInstance(baseUrl: String): ApiClient {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: ApiClient(baseUrl).also { INSTANCE = it }
+        fun getInstance(baseUrl: String, sharedSecret: String): ApiClient {
+            // Trim and sanitize URL
+            val sanitizedBaseUrl = baseUrl.trim().removeSuffix("/") + "/"
+            
+            // Check for invalid URL format
+            if (sanitizedBaseUrl.toHttpUrlOrNull() == null) {
+                Log.e("ApiClient", "Invalid base URL: $sanitizedBaseUrl")
+                return INSTANCE ?: ApiClient("http://localhost/", "") // Fallback
+            }
+
+            return synchronized(this) {
+                if (
+                    INSTANCE == null ||
+                    instanceBaseUrl != sanitizedBaseUrl ||
+                    instanceSharedSecret != sharedSecret
+                ) {
+                    INSTANCE = ApiClient(sanitizedBaseUrl, sharedSecret)
+                    instanceBaseUrl = sanitizedBaseUrl
+                    instanceSharedSecret = sharedSecret
+                }
+                INSTANCE!!
             }
         }
 
-        fun updateBaseUrl(baseUrl: String) {
+        fun updateBaseUrl(baseUrl: String, sharedSecret: String) {
             synchronized(this) {
-                INSTANCE = ApiClient(baseUrl)
+                val normalizedBaseUrl = baseUrl.removeSuffix("/") + "/"
+                if (
+                    INSTANCE == null ||
+                    instanceBaseUrl != normalizedBaseUrl ||
+                    instanceSharedSecret != sharedSecret
+                ) {
+                    INSTANCE = ApiClient(normalizedBaseUrl, sharedSecret)
+                    instanceBaseUrl = normalizedBaseUrl
+                    instanceSharedSecret = sharedSecret
+                }
             }
         }
     }
